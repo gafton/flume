@@ -34,12 +34,11 @@ import com.cloudera.flume.conf.FlumeConfigData;
 import com.cloudera.flume.conf.FlumeConfiguration;
 import com.cloudera.flume.conf.FlumeSpecException;
 import com.cloudera.flume.core.Driver;
+import com.cloudera.flume.core.Driver.DriverState;
 import com.cloudera.flume.core.DriverListener;
 import com.cloudera.flume.core.EventSink;
 import com.cloudera.flume.core.EventSource;
 import com.cloudera.flume.core.connector.DirectDriver;
-import com.cloudera.flume.handlers.debug.LazyOpenDecorator;
-import com.cloudera.flume.handlers.debug.LazyOpenSource;
 import com.cloudera.flume.master.StatusManager.NodeState;
 import com.cloudera.flume.master.StatusManager.NodeStatus;
 import com.cloudera.flume.reporter.ReportEvent;
@@ -120,7 +119,7 @@ public class LogicalNode implements Reportable {
         VERSION_INFIMUM, FlumeConfiguration.get().getDefaultFlowName());
   }
 
-  private void openSourceSink(EventSource newSrc, EventSink newSnk)
+  private void ensureClosedSourceSink(EventSource newSrc, EventSink newSnk)
       throws IOException, InterruptedException {
     if (newSnk != null) {
       if (snk != null) {
@@ -133,7 +132,6 @@ public class LogicalNode implements Reportable {
         }
       }
       snk = newSnk;
-      snk.open();
     }
 
     if (newSrc != null) {
@@ -147,34 +145,41 @@ public class LogicalNode implements Reportable {
         }
       }
       src = newSrc;
-      src.open();
     }
   }
 
   /**
    * This opens the specified source and sink. If this is successful, it then
    * sets these as the node's source and sink, and starts a thread that pumps
-   * source values into the sink.
+   * source values into the sink. This will block until the previous driver has
+   * shutdown but will return as the new driver is starting.
    */
-  synchronized void openLoadNode(EventSource newSrc, EventSink newSnk)
+  synchronized void loadNodeDriver(EventSource newSrc, EventSink newSnk)
       throws IOException, InterruptedException {
-    // TODO HACK! This is to prevent heartbeat from hanging if one of the
-    // configs is unable to start due to open exception. It has the effect of
-    // deferring any exceptions open would have triggered into the Driver thread.
-    // This acts similarly to a 'future' concurrency concept.
+    ensureClosedSourceSink(newSrc, newSnk);
+    startNodeDriver();
+  }
 
-    newSnk = new LazyOpenDecorator<EventSink>(newSnk);
-    newSrc = new LazyOpenSource<EventSource>(newSrc);
-
-    openSourceSink(newSrc, newSnk);
-    loadNode();
+  /**
+   * This opens the specified source and sink. If this is successful, it then
+   * sets these as the node's source and sink, and starts a thread that pumps
+   * source values into the sink.
+   * 
+   * This will block for up to the given amount of time waiting for ACTIVE state
+   * to be reached. This is useful for testing.
+   */
+  synchronized void startNodeDriver(EventSource newSrc, EventSink newSink,
+      long ms) throws IOException, InterruptedException {
+    ensureClosedSourceSink(newSrc, newSink);
+    startNodeDriver();
+    getDriver().waitForState(DriverState.ACTIVE, ms);
   }
 
   /**
    * This stops any existing connection (source=>sink pumper), and then creates
    * a new one with the specified *already opened* source and sink arguments.
    */
-  private void loadNode() throws IOException {
+  private void startNodeDriver() throws IOException {
 
     if (driver != null) {
       // stop the existing connector.
@@ -309,9 +314,7 @@ public class LogicalNode implements Reportable {
       }
 
     } catch (RuntimeException e) {
-      LOG
-          .error("Runtime ex: " + new File(".").getAbsolutePath() + " " + cfg,
-              e);
+      LOG.error("Runtime ex: " + new File(".").getAbsolutePath() + " " + cfg, e);
       state.state = NodeState.ERROR;
       throw e;
     } catch (FlumeSpecException e) {
@@ -325,10 +328,7 @@ public class LogicalNode implements Reportable {
     }
 
     try {
-      openLoadNode(newSrc, newSnk);
-
-      // Since sources/sinks are lazy, we don't know if the config is good until
-      // the first append succeeds.
+      loadNodeDriver(newSrc, newSnk);
 
       // We have successfully opened the source and sinks for the config. We can
       // mark this as the last good / successful config. It does not mean that
@@ -416,7 +416,7 @@ public class LogicalNode implements Reportable {
     ReportEvent rpt = new ReportEvent(nodeName);
     rpt.setStringMetric("nodename", nodeName);
     rpt.setStringMetric("version", new Date(lastGoodCfg.timestamp).toString());
-    rpt.setStringMetric("state", state.state.toString());
+    rpt.setStringMetric("state", driver.getState().toString());
     rpt.setStringMetric("hostname", state.host);
     rpt.setStringMetric("sourceConfig", (lastGoodCfg.sourceConfig == null) ? ""
         : lastGoodCfg.sourceConfig);
@@ -453,6 +453,13 @@ public class LogicalNode implements Reportable {
 
   public NodeStatus getStatus() {
     return state;
+  }
+
+  /**
+   * @return the driver responsible for opening/appending/closing
+   */
+  public Driver getDriver() {
+    return driver;
   }
 
   /**

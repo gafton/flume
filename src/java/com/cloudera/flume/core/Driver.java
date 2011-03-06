@@ -19,8 +19,6 @@ package com.cloudera.flume.core;
 
 import java.io.IOException;
 
-import com.cloudera.flume.master.StatusManager.NodeState;
-
 /**
  * This is an edge that connects a source to a sink. This is an abstract class
  * because we can have many different properties for the connection between
@@ -70,7 +68,28 @@ abstract public class Driver {
    */
   abstract public boolean join(long ms) throws InterruptedException;
 
-  abstract public NodeState getState();
+  /**
+   * Wait for transition to the specified state for at most millis ms.
+   * 
+   * @param state
+   * @param millis
+   * @return true if state transitioned to desired state, false if timeoed out.
+   * @throws InterruptedException
+   */
+  abstract public boolean waitForState(DriverState state, long millis)
+      throws InterruptedException;
+
+  abstract public boolean waitForAtLeastState(DriverState state, long millis)
+      throws InterruptedException;
+
+  /**
+   * Driver state
+   */
+  public enum DriverState {
+    HELLO, OPENING, ACTIVE, CLOSING, IDLE, ERROR
+  };
+
+  abstract public DriverState getState();
 
   abstract public void registerListener(DriverListener listener);
 

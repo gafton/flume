@@ -75,7 +75,7 @@ public class StatusManager implements Reportable {
   }
 
   public enum NodeState {
-    HELLO, IDLE, CONFIGURING, ACTIVE, ERROR, LOST, DECOMMISSIONED
+    HELLO,OPENING, ACTIVE, CLOSING, IDLE, ERROR, LOST, DECOMMISSIONED
   };
 
   // runtime state of the flume system

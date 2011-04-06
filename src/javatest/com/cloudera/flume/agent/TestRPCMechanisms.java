@@ -352,7 +352,7 @@ public class TestRPCMechanisms {
         MasterClientServerThrift
             .stateFromThrift(com.cloudera.flume.conf.thrift.FlumeNodeState.IDLE));
     assertEquals(
-        StatusManager.NodeState.CONFIGURING,
+        StatusManager.NodeState.OPENING,
         MasterClientServerThrift
             .stateFromThrift(com.cloudera.flume.conf.thrift.FlumeNodeState.CONFIGURING));
 
@@ -366,7 +366,7 @@ public class TestRPCMechanisms {
         MasterClientServerThrift.stateToThrift(StatusManager.NodeState.IDLE));
     assertEquals(com.cloudera.flume.conf.thrift.FlumeNodeState.CONFIGURING,
         MasterClientServerThrift
-            .stateToThrift(StatusManager.NodeState.CONFIGURING));
+            .stateToThrift(StatusManager.NodeState.OPENING));
 
     // AVRO NODE STATE
     assertEquals(StatusManager.NodeState.HELLO,
@@ -377,7 +377,7 @@ public class TestRPCMechanisms {
         MasterClientServerAvro.stateFromAvro(FlumeNodeState.ERROR));
     assertEquals(StatusManager.NodeState.IDLE,
         MasterClientServerAvro.stateFromAvro(FlumeNodeState.IDLE));
-    assertEquals(StatusManager.NodeState.CONFIGURING,
+    assertEquals(StatusManager.NodeState.OPENING,
         MasterClientServerAvro.stateFromAvro(FlumeNodeState.CONFIGURING));
 
     assertEquals(FlumeNodeState.HELLO,
@@ -389,6 +389,6 @@ public class TestRPCMechanisms {
     assertEquals(FlumeNodeState.IDLE,
         MasterClientServerAvro.stateToAvro(StatusManager.NodeState.IDLE));
     assertEquals(FlumeNodeState.CONFIGURING,
-        MasterClientServerAvro.stateToAvro(StatusManager.NodeState.CONFIGURING));
+        MasterClientServerAvro.stateToAvro(StatusManager.NodeState.OPENING));
   }
 }

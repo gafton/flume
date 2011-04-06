@@ -370,6 +370,7 @@ public class LogicalNode implements Reportable {
   }
 
   public NodeStatus getStatus() {
+	state.state = NodeState.valueOf(getDriver().getState().toString());
     return state;
   }
 
